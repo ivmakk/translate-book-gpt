@@ -1,8 +1,12 @@
 # Translate books with GPT
 
+> ⚠️ **Disclaimer:** This project is intended for personal use only. Ensure you have the right to translate and use the eBooks you process with this tool. Unauthorized use of copyrighted material is illegal and strictly prohibited. 
+> 
+> This fork of the [original project](https://github.com/jb41/translate-book) does not maintain backward compatibility, as it focuses on developing new features primarily oriented towards the EPUB format.
+
 This project harnesses the power of GPT-4 LLM to translate eBooks from any language into your preferred language, maintaining the integrity and structure of the original content. Imagine having access to a vast world of literature, regardless of the original language, right at your fingertips.
 
-This tool not only translates the text but also carefully compiles each element of the eBook – chapters, footnotes, and all – into a perfectly formatted EPUB file. We use the `gpt-4-1106-preview` (GPT-4 Turbo) model by default to ensure high-quality translations. However, we understand the need for flexibility, so we've made it easy to switch models in `main.py` according to your specific needs.
+This tool not only translates the text but also carefully compiles each element of the eBook – chapters, footnotes, and all – into a perfectly formatted EPUB file. We use the [`gpt-4o-mini`](https://platform.openai.com/docs/models/gpt-4o-mini#gpt-4o-mini) (GPT-4 Turbo) model by default to ensure high-quality translations. However, we understand the need for flexibility, so we've made it easy to switch models in `main.py` according to your specific needs.
 
 
 ## 🛠️ Installation

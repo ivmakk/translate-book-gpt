@@ -10,6 +10,8 @@ from ebooklib import epub
 from bs4 import BeautifulSoup
 from openai import OpenAI
 
+from src.openai_utils import calculate_price
+
 ## VS Code Debugging
 # import ptvsd
 #
@@ -87,7 +89,7 @@ def split_html_by_newline(html_str, max_chunk_size=10000):
     return chunks
 
 def system_prompt(from_lang, to_lang):
-    p  = "You are an %s-to-%s translator. " % (from_lang, to_lang)
+    p  = "You are a book translator. Translate the text from %s to %s. " % (from_lang, to_lang)
     p += "Keep all special characters and HTML tags as in the source text. Return only %s translation." % to_lang
     return p
 
@@ -204,15 +206,15 @@ def show_chunks(input_epub_path):
 
             print("Total tokens in document: %d\n" % document_total_tokens)
 
-            input_price = calculate_input_price(document_total_tokens, GPT_MODEL_NAME)
-            output_price = calculate_output_price(document_total_tokens, GPT_MODEL_NAME)
+            input_price = calculate_price(document_total_tokens, GPT_MODEL_NAME, 'input')
+            output_price = calculate_price(document_total_tokens, GPT_MODEL_NAME, 'output')
             total_price = input_price + output_price
             print("Price for input: $%.2f, Price for output: $%.2f, Total price: $%.2f" % (input_price, output_price, total_price))
             
             print("--------------------------------------------------\n")
 
-    input_price = calculate_input_price(book_total_tokens, GPT_MODEL_NAME)
-    output_price = calculate_output_price(book_total_tokens, GPT_MODEL_NAME)
+    input_price = calculate_price(book_total_tokens, GPT_MODEL_NAME, 'input')
+    output_price = calculate_price(book_total_tokens, GPT_MODEL_NAME, 'output')
     total_price = input_price + output_price
     print("Total book price for input: $%.2f, Price for output: $%.2f, Total price: $%.2f" % (input_price, output_price, total_price))
 
@@ -231,37 +233,6 @@ def show_chapters(input_epub_path):
             print(chapter_beginning + "\n\n")
 
             current_chapter += 1
-
-def calculate_input_price(tokens, model_name):
-    """See https://openai.com/api/pricing/ for the latest pricing information."""
-    model_prices_per_million = {
-        'gpt-4o': 2.50,
-        'gpt-4o-mini': 0.150
-    }
-
-    if model_name not in model_prices_per_million:
-        return 0
-
-    price_per_million = model_prices_per_million[model_name]
-    price_per_token = price_per_million / 1_000_000
-
-    return tokens * price_per_token
-
-def calculate_output_price(tokens, model_name):
-    """See https://openai.com/api/pricing/ for the latest pricing information."""
-    model_prices_per_million = {
-        'gpt-4o': 10.00,
-        'gpt-4o-mini': 0.6
-    }
-
-    if model_name not in model_prices_per_million:
-        return 0
-
-    price_per_million = model_prices_per_million[model_name]
-    price_per_token = price_per_million / 1_000_000
-
-    return tokens * price_per_token
-
 
 if __name__ == "__main__":
     # Create the top-level parser
