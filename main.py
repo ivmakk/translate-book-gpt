@@ -1,6 +1,7 @@
 import html
 import langcodes
 import tiktoken
+import typer
 import argparse, \
        re, \
        yaml
@@ -11,6 +12,8 @@ from bs4 import BeautifulSoup
 from openai import OpenAI
 
 from src.openai_utils import calculate_price
+
+app = typer.Typer()
 
 ## VS Code Debugging
 # import ptvsd
@@ -234,48 +237,27 @@ def show_chapters(input_epub_path):
 
             current_chapter += 1
 
+@app.command('translate', help="Translate the book.")
+def translate_command(
+    input: str = typer.Option(..., help="Input file path."),
+    output: str = typer.Option(..., help="Output file path."),
+    config: str = typer.Option(..., help="Configuration file path."),
+    from_chapter: int = typer.Option(0, help="Starting chapter for translation."),
+    to_chapter: int = typer.Option(9999, help="Ending chapter for translation."),
+    from_lang: str = typer.Option('EN', help="Source language."),
+    to_lang: str = typer.Option('PL', help="Target language.")
+):
+    config_data = read_config(config)
+    openai_client = OpenAI(api_key=config_data['openai']['api_key'])
+    translate(openai_client, input, output, from_chapter, to_chapter, from_lang, to_lang)
+
+@app.command('show-chapters', help="Show the chapters of the book.")
+def show_chapters_command(input: str = typer.Option(..., help="Input file path.")):
+    show_chapters(input)
+
+@app.command('show-chunks', help="Show the chunks of the book chapters and estimated prices for each.")
+def show_chunks_command(input: str = typer.Option(..., help="Input file path.")):
+    show_chunks(input)
+            
 if __name__ == "__main__":
-    # Create the top-level parser
-    parser = argparse.ArgumentParser(description='App to translate or show chapters of a book.')
-    subparsers = parser.add_subparsers(dest='mode', help='Mode of operation.')
-
-    # Create the parser for the "translate" mode
-    parser_translate = subparsers.add_parser('translate', help='Translate a book.')
-    parser_translate.add_argument('--input', required=True, help='Input file path.')
-    parser_translate.add_argument('--output', required=True, help='Output file path.')
-    parser_translate.add_argument('--config', required=True, help='Configuration file path.')
-    parser_translate.add_argument('--from-chapter', type=int, help='Starting chapter for translation.')
-    parser_translate.add_argument('--to-chapter', type=int, help='Ending chapter for translation.')
-    parser_translate.add_argument('--from-lang', help='Source language.', default='EN')
-    parser_translate.add_argument('--to-lang', help='Target language.', default='PL')
-
-    # Create the parser for the "show-chapters" mode
-    parser_show = subparsers.add_parser('show-chapters', help='Show the list of chapters.')
-    parser_show.add_argument('--input', required=True, help='Input file path.')
-
-    # Create the parser for the "show-chunks" mode
-    parser_show_chunks = subparsers.add_parser('show-chunks', help='Show the chunks of the book.')
-    parser_show_chunks.add_argument('--input', required=True, help='Input file path.')
-
-    # Parse the arguments
-    args = parser.parse_args()
-
-    # Call the appropriate function based on the mode
-    if args.mode == 'translate':
-        config = read_config(args.config)
-        from_chapter = int(args.from_chapter or 0)
-        to_chapter = int(args.to_chapter or 9999)
-        from_lang = args.from_lang
-        to_lang = args.to_lang
-        openai_client = OpenAI(api_key=config['openai']['api_key'])
-
-        translate(openai_client, args.input, args.output, from_chapter, to_chapter, from_lang, to_lang)
-
-    elif args.mode == 'show-chapters':
-        show_chapters(args.input)
-
-    elif args.mode == 'show-chunks':
-        show_chunks(args.input)
-
-    else:
-        parser.print_help()
+    app()
