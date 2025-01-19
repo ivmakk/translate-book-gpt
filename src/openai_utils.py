@@ -2,13 +2,19 @@
 INPUT_PRICES_PER_MILLION = {
     'gpt-4o': 2.50,
     'gpt-4o-mini': 0.150,
-    'o1-mini': 3.00
+    'o1-mini': 3.00,
+    'claude-3-haiku-20240307': 0.25,
+    'claude-3-5-haiku-20241022': 0.80,
+    'claude-3-5-sonnet-20241022': 3.00
 }
 
 OUTPUT_PRICES_PER_MILLION = {
     'gpt-4o': 10.00,
     'gpt-4o-mini': 0.6,
-    'o1-mini': 12.00
+    'o1-mini': 12.00,
+    'claude-3-haiku-20240307': 1.25,
+    'claude-3-5-haiku-20241022': 4.80,
+    'claude-3-5-sonnet-20241022': 15.00
 }
 
 def calculate_price(tokens, model_name, token_type='input'):

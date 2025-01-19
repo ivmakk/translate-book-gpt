@@ -5,6 +5,15 @@ from langchain_anthropic import ChatAnthropic
 from langchain_openai import ChatOpenAI
 from langchain_core.messages.ai import AIMessage
 
+MAX_OUPUT_TOKENS = {
+    'gpt-4o': 16_384,
+    'gpt-4o-mini': 16_384,
+    'o1-mini': 65_536,
+    'claude-3-haiku-20240307': 4_096,
+    'claude-3-5-haiku-20241022': 8_192,
+    'claude-3-5-sonnet-20241022': 8_192
+}
+
 
 def get_api_key(model_vendor) -> str:
     if model_vendor == "openai":
@@ -21,9 +30,11 @@ def get_model(
     api_key: str, model_vendor="openai", model_name="gpt-4o-mini", temperature: float = 0.2
 ) -> BaseLLM:
     if model_vendor == "openai":
+        max_tokens=MAX_OUPUT_TOKENS[model_name] or 16_384
         return ChatOpenAI(model_name=model_name, temperature=temperature, api_key=api_key)
     elif model_vendor == "anthropic":
-        return ChatAnthropic(model_name=model_name, temperature=temperature, api_key=api_key, max_tokens=4096)
+        max_tokens=MAX_OUPUT_TOKENS[model_name] or 4_096
+        return ChatAnthropic(model_name=model_name, temperature=temperature, api_key=api_key, max_tokens=max_tokens, stop=None)
     elif model_vendor == "google":
         raise NotImplementedError("Google model support is not implemented yet.")
     else:

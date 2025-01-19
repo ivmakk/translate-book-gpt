@@ -1,5 +1,8 @@
 # Translate books with GPT
 
+![Supported Python Versions](https://img.shields.io/badge/python-3.8%20%7C%203.9%20%7C%203.10%20%7C%203.11%20%7C%203.12-blue)
+
+
 > ⚠️ **Disclaimer:** This project is intended for personal use only. Ensure you have the right to translate and use the eBooks you process with this tool. Unauthorized use of copyrighted material is illegal and strictly prohibited. 
 > 
 > This fork of the [original project](https://github.com/jb41/translate-book) does not maintain backward compatibility, as it focuses on developing new features primarily oriented towards the EPUB format.
@@ -7,6 +10,14 @@
 This project harnesses the power of GPT-4 LLM to translate eBooks from any language into your preferred language, maintaining the integrity and structure of the original content. Imagine having access to a vast world of literature, regardless of the original language, right at your fingertips.
 
 This tool not only translates the text but also carefully compiles each element of the eBook – chapters, footnotes, and all – into a perfectly formatted EPUB file. Currently supported OpenAI and Anthropic models on both require API keys. However, we understand the need for flexibility, so we've made it easy to switch models in `main.py` according to your specific needs.
+
+
+## Requirements
+
+- Python 3.8 or higher
+- pip (Python package installer)
+
+Note: While the code may work with Python 3.7, we recommend Python 3.8+ for best compatibility with all dependencies and to ensure proper type hint support.
 
 
 ## 🛠️ Installation

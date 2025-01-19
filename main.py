@@ -54,7 +54,7 @@ def split_html_by_sentence(html_str, max_chunk_size=10000):
 
     return chunks
 
-def split_html_by_newline(html_str, max_chunk_size=5000):
+def split_html_by_newline(html_str, max_chunk_size=10000):
     chunks = []
     lines = html_str.split('\n')
 
@@ -107,7 +107,6 @@ def translate_chunk(client: BaseLLM, text, from_lang='EN', to_lang='PL', book_ti
         print(f"Warning: The number of lines in the original text ({original_lines}) and the decoded text ({decoded_lines}) are different.")
 
         should_retry = (
-            MODEL_VENDOR == 'openai' and
             retry_num < RETRY_LIMIT and 
             original_lines > MIN_LINES_FOR_RETRY and 
             abs(original_lines - decoded_lines) / original_lines > MAX_LINE_DIFF_PERCENTAGE

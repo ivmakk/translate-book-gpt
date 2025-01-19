@@ -5,7 +5,8 @@ TRANSLATE_PROMPT_SYSTEM = \
 Please translate the text from {from_lang} to {to_lang}.
 {book_details}
 Keep all special characters and HTML tags as in the source text.
-RETURN ONLY {to_lang} TRANSLATION."""
+Provide THE ENTIRE TRANSLATION in a single response and do not stop until the full text is translated.
+PLEASE RETURN ONLY {to_lang} TRANSLATION."""
 
 TRANSLATE_PROMPT = ChatPromptTemplate([
     ("system", TRANSLATE_PROMPT_SYSTEM),
