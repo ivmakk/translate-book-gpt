@@ -1,47 +1,31 @@
 import html
 import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
+from langchain.llms import BaseLLM
 import langcodes
 import tiktoken
 import typer
-import argparse, \
-       re, \
-       yaml
+import re
 
 import ebooklib
 from ebooklib import epub
 from bs4 import BeautifulSoup
 from openai import OpenAI
 
+from src.llm import extract_response_text, get_api_key, get_model
+from src.llm_prompts import TRANSLATE_PROMPT
+from src.llm_prompts import generate_book_info_prompt
 from src.openai_utils import calculate_price
 import tempfile
 
 app = typer.Typer()
 
-## VS Code Debugging
-# import ptvsd
-#
-# # Allow other computers to attach to ptvsd at this IP address and port.
-# #
-# # netstat -ano | findstr :5678
-# # taskkill /PID <PID> /F
-# #
-# # OR
-# #
-# # Stop-Process -Id (Get-NetTCPConnection -LocalPort 5678).OwningProcess -Force
-# ptvsd.enable_attach(address=('localhost', 5678), redirect_output=True)
-
-# # Pause the program until a remote debugger is attached
-# print("Waiting for debugger to attach...")
-# ptvsd.wait_for_attach()
-
-GPT_MODEL_NAME = 'gpt-4o'
-TEMPERATURE = 0.75
-
-def read_config(config_file):
-    with open(config_file, 'r') as f:
-        config = yaml.load(f, Loader=yaml.FullLoader)
-
-    return config
+MODEL_VENDOR = os.getenv("MODEL_VENDOR", "openai")
+MODEL_NAME = os.getenv("MODEL_NAME", "gpt-4o-mini")
+TEMPERATURE = float(os.getenv("TEMPERATURE", 0.2))
 
 
 def split_html_by_sentence(html_str, max_chunk_size=10000):
@@ -70,7 +54,7 @@ def split_html_by_sentence(html_str, max_chunk_size=10000):
 
     return chunks
 
-def split_html_by_newline(html_str, max_chunk_size=50000):
+def split_html_by_newline(html_str, max_chunk_size=5000):
     chunks = []
     lines = html_str.split('\n')
 
@@ -94,57 +78,57 @@ def split_html_by_newline(html_str, max_chunk_size=50000):
 
     return chunks
 
-def system_prompt(from_lang: str, to_lang: str, book_title=None, book_author=None):
+
+def translate_chunk(client: BaseLLM, text, from_lang='EN', to_lang='PL', book_title=None, book_author=None, retry_num=0):
+    RETRY_LIMIT = 3
+    MAX_LINE_DIFF_PERCENTAGE = 0.1
+    MIN_LINES_FOR_RETRY = 10
+
     full_from_lang = langcodes.Language.make(from_lang.lower()).display_name()
     full_to_lang = langcodes.Language.make(to_lang.lower()).display_name()
 
-    p = f"You are a professional book translator and {full_to_lang} native speaker. \n"
-    p += f"Please translate the text from {full_from_lang} to {full_to_lang}. \n"
-
-    if book_title:
-        p += "The book title is '%s'. \n" % book_title
-                
-    if book_author:
-        p += "The book author is '%s'. \n" % book_author
-
-    if book_title or book_author:
-        p += "Rely on your knowledge of the author and book to determine the appropriate tone and style for the translation. \n"
-
-    p += "Keep all special characters and HTML tags as in the source text. RETURN ONLY %s TRANSLATION." % full_to_lang
-    
-    return p
-
-
-def translate_chunk(client, text, from_lang='EN', to_lang='PL', book_title=None, book_author=None, retry_num=0):
-    RETRY_LIMIT = 3 # Maximum number of retries for translation. Higher temperatures may require more retries.
-
-    response = client.chat.completions.create(
-        model=GPT_MODEL_NAME,
-        temperature=TEMPERATURE,
-        messages=[
-            { 'role': 'system', 'content': system_prompt(from_lang, to_lang, book_title, book_author) },
-            { 'role': 'user', 'content':  html.escape(text) },
-        ]
+    messages = TRANSLATE_PROMPT.format_messages(
+        from_lang=full_from_lang,
+        to_lang=full_to_lang,
+        book_details=generate_book_info_prompt(book_title, book_author),
+        source_text=html.escape(text)
     )
 
-    translated_text = response.choices[0].message.content
+    response = client.invoke(messages)
+    print("\t\t" + str(response.usage_metadata))
+
+    translated_text = extract_response_text(response)
     decoded_text = html.unescape(translated_text)
 
     original_lines = text.count('\n')
     decoded_lines = decoded_text.count('\n')
 
     if abs(original_lines - decoded_lines) > 1:
-        print("Warning: The number of lines in the original text (%d) and the decoded text (%d) are different." % (original_lines, decoded_lines))
+        print(f"Warning: The number of lines in the original text ({original_lines}) and the decoded text ({decoded_lines}) are different.")
 
-        # Retry translation if the number of lines is significantly different
-        if retry_num < RETRY_LIMIT and original_lines > 10 and abs(original_lines - decoded_lines) / original_lines > 0.1:
-            print("Retrying translation... Attempt %d/%d" % (retry_num + 1, RETRY_LIMIT))
-            return translate_chunk(client, text, from_lang, to_lang, book_title, book_author, retry_num + 1)
+        should_retry = (
+            MODEL_VENDOR == 'openai' and
+            retry_num < RETRY_LIMIT and 
+            original_lines > MIN_LINES_FOR_RETRY and 
+            abs(original_lines - decoded_lines) / original_lines > MAX_LINE_DIFF_PERCENTAGE
+        )
+
+        if should_retry:
+            print(f"Retrying translation... Attempt {retry_num + 1}/{RETRY_LIMIT}")
+            return translate_chunk(
+                client=client,
+                text=text, 
+                from_lang=from_lang, 
+                to_lang=to_lang, 
+                book_title=book_title, 
+                book_author=book_author, 
+                retry_num=retry_num + 1
+            )
 
     return decoded_text
 
 
-def translate_toc(client, toc, from_lang='EN', to_lang='PL'):
+def translate_toc(client: BaseLLM, toc, from_lang='EN', to_lang='PL'):
     toc_list = list(toc)
     toc_text = "\n".join([item.title.strip() for item in toc_list if isinstance(item, epub.Link)])
     
@@ -162,7 +146,7 @@ def translate_toc(client, toc, from_lang='EN', to_lang='PL'):
     
     return tuple(translated_toc)
 
-def translate_text(client, text, from_lang='EN', to_lang='PL', temp_dir=None, book_title=None, book_author=None):
+def translate_text(client: BaseLLM, text, from_lang='EN', to_lang='PL', temp_dir=None, book_title=None, book_author=None):
     translated_chunks = []
     chunks = split_html_by_newline(text)
 
@@ -177,7 +161,7 @@ def translate_text(client, text, from_lang='EN', to_lang='PL', temp_dir=None, bo
     return ' '.join(translated_chunks)
 
 
-def translate(client, input_epub_path, output_epub_path, from_chapter=0, to_chapter=9999, from_lang='EN', to_lang='PL', toc=True):
+def translate(client: BaseLLM, input_epub_path, output_epub_path, from_chapter=0, to_chapter=9999, from_lang='EN', to_lang='PL', toc=True):
     book = epub.read_epub(input_epub_path)
 
     book.set_unique_metadata('DC', 'language', langcodes.standardize_tag(to_lang))
@@ -191,7 +175,12 @@ def translate(client, input_epub_path, output_epub_path, from_chapter=0, to_chap
     temp_dir = tempfile.mkdtemp()
     print("Debugging: Translated chunks will be stored in the temporary directory: %s" % temp_dir)
 
-    prompt = system_prompt(from_lang, to_lang, book_title, book_author)
+    prompt = TRANSLATE_PROMPT.format_messages(
+        from_lang=from_lang,
+        to_lang=to_lang,
+        book_details=generate_book_info_prompt(book_title, book_author),
+        source_text="..."
+    )[0].content
     indented_prompt = '\n'.join(['\t' + line for line in prompt.split('\n')])
     print("Prompt sample: \n%s" % indented_prompt)
 
@@ -222,7 +211,7 @@ def translate(client, input_epub_path, output_epub_path, from_chapter=0, to_chap
 def show_chunks(input_epub_path):
     book = epub.read_epub(input_epub_path)
 
-    encoding = tiktoken.encoding_for_model(GPT_MODEL_NAME)
+    encoding = tiktoken.encoding_for_model(MODEL_NAME)
 
     book_total_tokens = 0
     for item in book.get_items():
@@ -249,15 +238,15 @@ def show_chunks(input_epub_path):
 
             print("Total tokens in document: %d\n" % document_total_tokens)
 
-            input_price = calculate_price(document_total_tokens, GPT_MODEL_NAME, 'input')
-            output_price = calculate_price(document_total_tokens, GPT_MODEL_NAME, 'output')
+            input_price = calculate_price(document_total_tokens, MODEL_NAME, 'input')
+            output_price = calculate_price(document_total_tokens, MODEL_NAME, 'output')
             total_price = input_price + output_price
             print("Price for input: $%.2f, Price for output: $%.2f, Total price: $%.2f" % (input_price, output_price, total_price))
             
             print("--------------------------------------------------\n")
 
-    input_price = calculate_price(book_total_tokens, GPT_MODEL_NAME, 'input')
-    output_price = calculate_price(book_total_tokens, GPT_MODEL_NAME, 'output')
+    input_price = calculate_price(book_total_tokens, MODEL_NAME, 'input')
+    output_price = calculate_price(book_total_tokens, MODEL_NAME, 'output')
     total_price = input_price + output_price
     print("Total book price for input: $%.2f, Price for output: $%.2f, Total price: $%.2f" % (input_price, output_price, total_price))
 
@@ -281,16 +270,15 @@ def show_chapters(input_epub_path):
 def translate_command(
     input: str = typer.Option(..., help="Input file path."),
     output: str = typer.Option(..., help="Output file path."),
-    config: str = typer.Option(..., help="Configuration file path."),
     from_chapter: int = typer.Option(0, help="Starting chapter for translation."),
     to_chapter: int = typer.Option(9999, help="Ending chapter for translation."),
     from_lang: str = typer.Option('EN', help="Source language."),
     to_lang: str = typer.Option('PL', help="Target language."),
     toc: bool = typer.Option(True, is_flag=True, help="Translate the table of contents.")
 ):
-    config_data = read_config(config)
-    openai_client = OpenAI(api_key=config_data['openai']['api_key'])
-    translate(openai_client, input, output, from_chapter, to_chapter, from_lang, to_lang, toc)
+    # client = get_model(os.getenv('OPENAI_API_KEY'), MODEL_VENDOR, MODEL_NAME, TEMPERATURE)
+    client = get_model(get_api_key(MODEL_VENDOR), MODEL_VENDOR, MODEL_NAME, TEMPERATURE)
+    translate(client, input, output, from_chapter, to_chapter, from_lang, to_lang, toc)
 
 @app.command('show-chapters', help="Show the chapters of the book.")
 def show_chapters_command(input: str = typer.Option(..., help="Input file path.")):
@@ -299,6 +287,6 @@ def show_chapters_command(input: str = typer.Option(..., help="Input file path."
 @app.command('show-chunks', help="Show the chunks of the book chapters and estimated prices for each.")
 def show_chunks_command(input: str = typer.Option(..., help="Input file path.")):
     show_chunks(input)
-            
+
 if __name__ == "__main__":
     app()

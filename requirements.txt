@@ -4,3 +4,7 @@ openai==1.59.7
 PyYAML==6.0.1
 tiktoken==0.8.0
 langcodes==3.5.0
+langchain==0.3.14
+langchain-openai
+langchain-anthropic
+python-dotenv==1.0.1

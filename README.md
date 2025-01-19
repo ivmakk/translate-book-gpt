@@ -6,7 +6,7 @@
 
 This project harnesses the power of GPT-4 LLM to translate eBooks from any language into your preferred language, maintaining the integrity and structure of the original content. Imagine having access to a vast world of literature, regardless of the original language, right at your fingertips.
 
-This tool not only translates the text but also carefully compiles each element of the eBook – chapters, footnotes, and all – into a perfectly formatted EPUB file. We use the [`gpt-4o-mini`](https://platform.openai.com/docs/models/gpt-4o-mini#gpt-4o-mini) (GPT-4 Turbo) model by default to ensure high-quality translations. However, we understand the need for flexibility, so we've made it easy to switch models in `main.py` according to your specific needs.
+This tool not only translates the text but also carefully compiles each element of the eBook – chapters, footnotes, and all – into a perfectly formatted EPUB file. Currently supported OpenAI and Anthropic models on both require API keys. However, we understand the need for flexibility, so we've made it easy to switch models in `main.py` according to your specific needs.
 
 
 ## 🛠️ Installation
@@ -15,10 +15,10 @@ To install the necessary components for our project, follow these simple steps:
 
 ```bash
 pip install -r requirements.txt
-cp config.yaml.example config.yaml
+cp .env.example .env
 ```
 
-Remember to add your OpenAI key to `config.yaml`.
+Remember to add your API key(s) to `.env`.
 
 
 ## 🎮 Usage
@@ -42,7 +42,7 @@ This command will display all the chapters, helping you to plan your translation
 To translate a book from English to Polish, use the following command:
 
 ```bash
-python main.py translate --input yourbook.epub --output translatedbook.epub --config config.yaml --from-lang EN --to-lang PL
+python main.py translate --input yourbook.epub --output translatedbook.epub  --from-lang EN --to-lang PL
 ```
 
 #### Advanced Usage
@@ -50,9 +50,52 @@ python main.py translate --input yourbook.epub --output translatedbook.epub --co
 For more specific needs, such as translating from chapter 13 to chapter 37 from English to Polish, use:
 
 ```bash
-python main.py translate --input yourbook.epub --output translatedbook.epub --config config.yaml --from-chapter 13 --to-chapter 37 --from-lang EN --to-lang PL
+python main.py translate --input yourbook.epub --output translatedbook.epub --from-chapter 13 --to-chapter 37 --from-lang EN --to-lang PL
 ```
 
+
+## 📚 Configuration
+
+All configuration values are defined as environment variables and can be stored in `.env` file.
+
+- `MODEL_VENDOR`: The AI model provider
+  - Supported values: `openai`, `anthropic`
+  - Default: `openai`
+
+- `MODEL_NAME`: Name of the model to use
+  - Supported values:
+    - For OpenAI : `gpt-4o`, `gpt-4o-mini`, `o1-mini` (see [full list](https://platform.openai.com/docs/models))
+    - For Anthropic : `claude-2`, `claude-instant-1` (see [full list](https://docs.anthropic.com/en/docs/about-claude/models))
+  - Default: `gpt-4o-mini`
+
+- `TEMPERATURE`: Controls randomness in model responses. Lower values are more focused/deterministic
+  - Supported values: `0.0` to `1.0`
+  - Default: `0.2`
+
+- `OPENAI_API_KEY`: Your OpenAI API key. Required when using OpenAI models.
+
+- `ANTHROPIC_API_KEY`: Your Anthropic API key. Required when using Anthropic models.
+
+- `ANTHROPIC_API_KEY`: Your Anthropic API key. Skip if not using Anthropic model.
+  - Supported values: Valid Anthropic API key
+  - Default: None
+
+
+## Models Differences
+
+### Tokens Usage
+
+Each model has different token usage, token input/putput limits and pricing.
+
+For example, the same content translated by `gpt-4o-mini` and `claude-3-haiku-20240307` shows different token usage:
+
+| Model | Input Tokens | Output Tokens | Total Tokens |
+|-------|--------------|---------------|--------------|
+| gpt-4o-mini | 1,101 | 1,160 | 2,261 |
+| gpt-4o | 1,101 | 1,172 | 2,273 |
+| claude-3-haiku-20240307 | 1,437 | 1,546 | 2,983 |
+
+To accommodate model token limits, adjust the `max_chunk_size` parameter in splitter functions. For example, setting `max_chunk_size=5000` ensures chunks fit within the 4,096 token limit of `claude-3-haiku-20240307` for cyrillic target language. This helps prevent truncation while maintaining translation quality.
 
 ## Converting from AZW3 to EPUB
 
