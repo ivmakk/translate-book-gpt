@@ -1,4 +1,5 @@
 import html
+import os
 import langcodes
 import tiktoken
 import typer
@@ -12,6 +13,7 @@ from bs4 import BeautifulSoup
 from openai import OpenAI
 
 from src.openai_utils import calculate_price
+import tempfile
 
 app = typer.Typer()
 
@@ -32,7 +34,8 @@ app = typer.Typer()
 # print("Waiting for debugger to attach...")
 # ptvsd.wait_for_attach()
 
-GPT_MODEL_NAME = 'gpt-4o-mini'
+GPT_MODEL_NAME = 'gpt-4o'
+TEMPERATURE = 0.75
 
 def read_config(config_file):
     with open(config_file, 'r') as f:
@@ -67,7 +70,7 @@ def split_html_by_sentence(html_str, max_chunk_size=10000):
 
     return chunks
 
-def split_html_by_newline(html_str, max_chunk_size=10000):
+def split_html_by_newline(html_str, max_chunk_size=50000):
     chunks = []
     lines = html_str.split('\n')
 
@@ -91,18 +94,35 @@ def split_html_by_newline(html_str, max_chunk_size=10000):
 
     return chunks
 
-def system_prompt(from_lang, to_lang):
-    p  = "You are a book translator. Translate the text from %s to %s. " % (from_lang, to_lang)
-    p += "Keep all special characters and HTML tags as in the source text. Return only %s translation." % to_lang
+def system_prompt(from_lang: str, to_lang: str, book_title=None, book_author=None):
+    full_from_lang = langcodes.Language.make(from_lang.lower()).display_name()
+    full_to_lang = langcodes.Language.make(to_lang.lower()).display_name()
+
+    p = f"You are a professional book translator and {full_to_lang} native speaker. \n"
+    p += f"Please translate the text from {full_from_lang} to {full_to_lang}. \n"
+
+    if book_title:
+        p += "The book title is '%s'. \n" % book_title
+                
+    if book_author:
+        p += "The book author is '%s'. \n" % book_author
+
+    if book_title or book_author:
+        p += "Rely on your knowledge of the author and book to determine the appropriate tone and style for the translation. \n"
+
+    p += "Keep all special characters and HTML tags as in the source text. RETURN ONLY %s TRANSLATION." % full_to_lang
+    
     return p
 
 
-def translate_chunk(client, text, from_lang='EN', to_lang='PL'):
+def translate_chunk(client, text, from_lang='EN', to_lang='PL', book_title=None, book_author=None, retry_num=0):
+    RETRY_LIMIT = 3 # Maximum number of retries for translation. Higher temperatures may require more retries.
+
     response = client.chat.completions.create(
         model=GPT_MODEL_NAME,
-        temperature=0.2,
+        temperature=TEMPERATURE,
         messages=[
-            { 'role': 'developer', 'content': system_prompt(from_lang, to_lang) },
+            { 'role': 'system', 'content': system_prompt(from_lang, to_lang, book_title, book_author) },
             { 'role': 'user', 'content':  html.escape(text) },
         ]
     )
@@ -115,6 +135,11 @@ def translate_chunk(client, text, from_lang='EN', to_lang='PL'):
 
     if abs(original_lines - decoded_lines) > 1:
         print("Warning: The number of lines in the original text (%d) and the decoded text (%d) are different." % (original_lines, decoded_lines))
+
+        # Retry translation if the number of lines is significantly different
+        if retry_num < RETRY_LIMIT and original_lines > 10 and abs(original_lines - decoded_lines) / original_lines > 0.1:
+            print("Retrying translation... Attempt %d/%d" % (retry_num + 1, RETRY_LIMIT))
+            return translate_chunk(client, text, from_lang, to_lang, book_title, book_author, retry_num + 1)
 
     return decoded_text
 
@@ -137,33 +162,48 @@ def translate_toc(client, toc, from_lang='EN', to_lang='PL'):
     
     return tuple(translated_toc)
 
-def translate_text(client, text, from_lang='EN', to_lang='PL'):
+def translate_text(client, text, from_lang='EN', to_lang='PL', temp_dir=None, book_title=None, book_author=None):
     translated_chunks = []
     chunks = split_html_by_newline(text)
 
     for i, chunk in enumerate(chunks):
         print("\tTranslating chunk %d/%d..." % (i+1, len(chunks)))
-        translated_chunks.append(translate_chunk(client, chunk, from_lang, to_lang))
+        translated_chunks.append(translate_chunk(client, chunk, from_lang, to_lang, book_title, book_author))
+
+        if temp_dir:
+            with open(os.path.join(temp_dir, 'translated_text_%d.txt' % i), 'w', encoding='utf-8') as f:
+                f.write(translated_chunks[-1])
 
     return ' '.join(translated_chunks)
 
 
-def translate(client, input_epub_path, output_epub_path, from_chapter=0, to_chapter=9999, from_lang='EN', to_lang='PL'):
+def translate(client, input_epub_path, output_epub_path, from_chapter=0, to_chapter=9999, from_lang='EN', to_lang='PL', toc=True):
     book = epub.read_epub(input_epub_path)
 
     book.set_unique_metadata('DC', 'language', langcodes.standardize_tag(to_lang))
 
+    book_title = book.get_metadata('DC', 'title')[0][0] if book.get_metadata('DC', 'title') else None
+    book_author = book.get_metadata('DC', 'creator')[0][0] if book.get_metadata('DC', 'creator') else None
+
     current_chapter = 1
     chapters_count = len([i for i in book.get_items() if i.get_type() == ebooklib.ITEM_DOCUMENT])
 
-    book.toc = translate_toc(client, book.toc, from_lang, to_lang)
+    temp_dir = tempfile.mkdtemp()
+    print("Debugging: Translated chunks will be stored in the temporary directory: %s" % temp_dir)
+
+    prompt = system_prompt(from_lang, to_lang, book_title, book_author)
+    indented_prompt = '\n'.join(['\t' + line for line in prompt.split('\n')])
+    print("Prompt sample: \n%s" % indented_prompt)
+
+    if toc:
+        book.toc = translate_toc(client, book.toc, from_lang, to_lang)
 
     for item in book.get_items():
         if item.get_type() == ebooklib.ITEM_DOCUMENT:
             if current_chapter >= from_chapter and current_chapter <= to_chapter:
                 print("Processing chapter %d/%d..." % (current_chapter, chapters_count))
                 soup = BeautifulSoup(item.content, 'html.parser')
-                translated_text = translate_text(client, str(soup), from_lang, to_lang)
+                translated_text = translate_text(client, str(soup), from_lang, to_lang, temp_dir)
 
                 soup.body.clear()
                 translated_soup = BeautifulSoup(translated_text, 'html.parser')
@@ -245,11 +285,12 @@ def translate_command(
     from_chapter: int = typer.Option(0, help="Starting chapter for translation."),
     to_chapter: int = typer.Option(9999, help="Ending chapter for translation."),
     from_lang: str = typer.Option('EN', help="Source language."),
-    to_lang: str = typer.Option('PL', help="Target language.")
+    to_lang: str = typer.Option('PL', help="Target language."),
+    toc: bool = typer.Option(True, is_flag=True, help="Translate the table of contents.")
 ):
     config_data = read_config(config)
     openai_client = OpenAI(api_key=config_data['openai']['api_key'])
-    translate(openai_client, input, output, from_chapter, to_chapter, from_lang, to_lang)
+    translate(openai_client, input, output, from_chapter, to_chapter, from_lang, to_lang, toc)
 
 @app.command('show-chapters', help="Show the chapters of the book.")
 def show_chapters_command(input: str = typer.Option(..., help="Input file path.")):

@@ -1,12 +1,14 @@
 ﻿# Prices per million tokens
 INPUT_PRICES_PER_MILLION = {
     'gpt-4o': 2.50,
-    'gpt-4o-mini': 0.150
+    'gpt-4o-mini': 0.150,
+    'o1-mini': 3.00
 }
 
 OUTPUT_PRICES_PER_MILLION = {
     'gpt-4o': 10.00,
-    'gpt-4o-mini': 0.6
+    'gpt-4o-mini': 0.6,
+    'o1-mini': 12.00
 }
 
 def calculate_price(tokens, model_name, token_type='input'):
