@@ -76,16 +76,10 @@ All configuration values are defined as environment variables and can be stored 
 
 - `ANTHROPIC_API_KEY`: Your Anthropic API key. Required when using Anthropic models.
 
-- `ANTHROPIC_API_KEY`: Your Anthropic API key. Skip if not using Anthropic model.
-  - Supported values: Valid Anthropic API key
-  - Default: None
-
-
 ## Models Differences
 
 ### Tokens Usage
-
-Each model has different token usage, token input/putput limits and pricing.
+Each model has different token usage, token input/output limits and pricing.
 
 For example, the same content translated by `gpt-4o-mini` and `claude-3-haiku-20240307` shows different token usage:
 
@@ -95,7 +89,7 @@ For example, the same content translated by `gpt-4o-mini` and `claude-3-haiku-20
 | gpt-4o | 1,101 | 1,172 | 2,273 |
 | claude-3-haiku-20240307 | 1,437 | 1,546 | 2,983 |
 
-To accommodate model token limits, adjust the `max_chunk_size` parameter in splitter functions. For example, setting `max_chunk_size=5000` ensures chunks fit within the 4,096 token limit of `claude-3-haiku-20240307` for cyrillic target language. This helps prevent truncation while maintaining translation quality.
+To accommodate model token limits, adjust the `max_chunk_size` parameter in splitter functions. For example, setting `max_chunk_size=5000` ensures chunks fit within the 4,096 token limit of `claude-3-haiku-20240307` for Cyrillic target languages. This helps prevent truncation while maintaining translation quality.
 
 ## Converting from AZW3 to EPUB
 
