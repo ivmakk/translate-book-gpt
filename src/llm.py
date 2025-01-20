@@ -2,6 +2,7 @@
 from typing import Any, Dict
 from langchain.llms import BaseLLM
 from langchain_anthropic import ChatAnthropic
+from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_openai import ChatOpenAI
 from langchain_core.messages.ai import AIMessage
 
@@ -11,7 +12,11 @@ MAX_OUPUT_TOKENS = {
     'o1-mini': 65_536,
     'claude-3-haiku-20240307': 4_096,
     'claude-3-5-haiku-20241022': 8_192,
-    'claude-3-5-sonnet-20241022': 8_192
+    'claude-3-5-sonnet-20241022': 8_192,
+    # https://ai.google.dev/gemini-api/docs/models/gemini
+    'gemini-1.5-pro': 8_192,
+    'gemini-1.5-flash': 8_192,
+    'gemini-2.0-flash-exp': 8_192
 }
 
 
@@ -21,7 +26,7 @@ def get_api_key(model_vendor) -> str:
     elif model_vendor == "anthropic":
         return os.getenv("ANTHROPIC_API_KEY")
     elif model_vendor == "google":
-        raise NotImplementedError("Google model support is not implemented yet.")
+        return os.getenv("GEMINI_API_KEY")
     else:
         raise ValueError(f"Unsupported model vendor: {model_vendor}")
 
@@ -30,13 +35,14 @@ def get_model(
     api_key: str, model_vendor="openai", model_name="gpt-4o-mini", temperature: float = 0.2
 ) -> BaseLLM:
     if model_vendor == "openai":
-        max_tokens=MAX_OUPUT_TOKENS[model_name] or 16_384
-        return ChatOpenAI(model_name=model_name, temperature=temperature, api_key=api_key)
+        max_tokens = MAX_OUPUT_TOKENS.get(model_name, 16_384)
+        return ChatOpenAI(model_name=model_name, temperature=temperature, api_key=api_key, max_tokens=max_tokens)
     elif model_vendor == "anthropic":
-        max_tokens=MAX_OUPUT_TOKENS[model_name] or 4_096
+        max_tokens = MAX_OUPUT_TOKENS.get(model_name, 4_096)
         return ChatAnthropic(model_name=model_name, temperature=temperature, api_key=api_key, max_tokens=max_tokens, stop=None)
     elif model_vendor == "google":
-        raise NotImplementedError("Google model support is not implemented yet.")
+        max_tokens = MAX_OUPUT_TOKENS.get(model_name, 8_192)
+        return ChatGoogleGenerativeAI(model=model_name, temperature=temperature, api_key=api_key, max_tokens=max_tokens)
     else:
         raise ValueError(f"Unsupported model vendor: {model_vendor}")
 

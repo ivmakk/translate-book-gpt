@@ -5,7 +5,9 @@ INPUT_PRICES_PER_MILLION = {
     'o1-mini': 3.00,
     'claude-3-haiku-20240307': 0.25,
     'claude-3-5-haiku-20241022': 0.80,
-    'claude-3-5-sonnet-20241022': 3.00
+    'claude-3-5-sonnet-20241022': 3.00,
+    'gemini-1.5-flash': 0.075,
+    'gemini-1.5-pro': 1.25
 }
 
 OUTPUT_PRICES_PER_MILLION = {
@@ -14,7 +16,9 @@ OUTPUT_PRICES_PER_MILLION = {
     'o1-mini': 12.00,
     'claude-3-haiku-20240307': 1.25,
     'claude-3-5-haiku-20241022': 4.80,
-    'claude-3-5-sonnet-20241022': 15.00
+    'claude-3-5-sonnet-20241022': 15.00,
+    'gemini-1.5-flash': 0.30,
+    'gemini-1.5-pro': 5.00
 }
 
 def calculate_price(tokens, model_name, token_type='input'):
