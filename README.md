@@ -87,6 +87,11 @@ All configuration values are defined as environment variables and can be stored 
 
 - `ANTHROPIC_API_KEY`: Your Anthropic API key. Required when using Anthropic models.
 
+### Translation Tunning
+
+- `MAX_CHUNK_SIZE`: Maximum size of the chunk to translate. Adjust this based on max output tokens of the model (e.g. for Anthropic models with 4096 tokens limit, set chunk size to ~5000).
+  - Default: `10_000` 
+
 ## Models Differences
 
 ### Tokens Usage

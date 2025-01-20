@@ -27,8 +27,10 @@ MODEL_VENDOR = os.getenv("MODEL_VENDOR", "openai")
 MODEL_NAME = os.getenv("MODEL_NAME", "gpt-4o-mini")
 TEMPERATURE = float(os.getenv("TEMPERATURE", 0.2))
 
+MAX_CHUNK_SIZE = int(os.getenv("MAX_CHUNK_SIZE", 10_000))
 
-def split_html_by_sentence(html_str, max_chunk_size=10000):
+
+def split_html_by_sentence(html_str, max_chunk_size=MAX_CHUNK_SIZE):
     sentences = html_str.split('. ')
 
     chunks = []
@@ -54,7 +56,7 @@ def split_html_by_sentence(html_str, max_chunk_size=10000):
 
     return chunks
 
-def split_html_by_newline(html_str, max_chunk_size=10000):
+def split_html_by_newline(html_str, max_chunk_size=MAX_CHUNK_SIZE):
     chunks = []
     lines = html_str.split('\n')
 
