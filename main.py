@@ -4,6 +4,7 @@ from dotenv import load_dotenv
 
 from src.epub_utils import preserve_head_links
 from src.html_utils import minify_attributes, restore_attributes
+from src.utils import generate_book_filename
 
 load_dotenv()
 
@@ -177,7 +178,7 @@ def translate_text(client: BaseLLM, text, from_lang='EN', to_lang='PL', temp_dir
     return str(soup)
 
 
-def translate(client: BaseLLM, input_epub_path, output_epub_path, from_chapter=0, to_chapter=9999, from_lang='EN', to_lang='PL', toc=True):
+def translate(client: BaseLLM, input_epub_path, output_epub_path=None, from_chapter=0, to_chapter=9999, from_lang='EN', to_lang='PL', toc=True):
     book = epub.read_epub(input_epub_path)
 
     book.set_unique_metadata('DC', 'language', langcodes.standardize_tag(to_lang))
@@ -215,12 +216,22 @@ def translate(client: BaseLLM, input_epub_path, output_epub_path, from_chapter=0
 
             current_chapter += 1
 
+    if not output_epub_path:
+        output_epub_path = generate_book_filename(to_lang, MODEL_NAME, TEMPERATURE, book_title, book_author)
+
     epub.write_epub(output_epub_path, book, {})
+    print("Translation completed. Output file: %s" % output_epub_path)
 
 def show_chunks(input_epub_path):
     book = epub.read_epub(input_epub_path)
 
-    encoding = tiktoken.encoding_for_model(MODEL_NAME)
+    model_name_tokenizer = MODEL_NAME
+    if model_name_tokenizer not in tiktoken.model.MODEL_TO_ENCODING:
+        print(f"Warning: Model {MODEL_NAME} is not supported by tiktoken (supported GPT models)")
+        print("\tUsing gpt-4o for token counting - note this is approximate and for informational purposes only")
+        model_name_tokenizer = "gpt-4o"
+    
+    encoding = tiktoken.encoding_for_model(model_name_tokenizer)
 
     book_total_tokens = 0
     for item in book.get_items():
@@ -278,14 +289,13 @@ def show_chapters(input_epub_path):
 @app.command('translate', help="Translate the book.")
 def translate_command(
     input: str = typer.Option(..., help="Input file path."),
-    output: str = typer.Option(..., help="Output file path."),
+    output: str = typer.Option(None, help="Output file path. By default it will be generated automatically in the format: <title>_<author>_<model>_t<temperature>_<to_lang>.epub"),
     from_chapter: int = typer.Option(0, help="Starting chapter for translation."),
     to_chapter: int = typer.Option(9999, help="Ending chapter for translation."),
     from_lang: str = typer.Option('EN', help="Source language."),
     to_lang: str = typer.Option('PL', help="Target language."),
     toc: bool = typer.Option(True, is_flag=True, help="Translate the table of contents.")
 ):
-    # client = get_model(os.getenv('OPENAI_API_KEY'), MODEL_VENDOR, MODEL_NAME, TEMPERATURE)
     client = get_model(get_api_key(MODEL_VENDOR), MODEL_VENDOR, MODEL_NAME, TEMPERATURE)
     translate(client, input, output, from_chapter, to_chapter, from_lang, to_lang, toc)
 
