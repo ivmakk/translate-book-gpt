@@ -2,6 +2,8 @@ import html
 import os
 from dotenv import load_dotenv
 
+from src.epub_utils import preserve_head_links
+
 load_dotenv()
 
 from langchain.llms import BaseLLM
@@ -18,7 +20,7 @@ from openai import OpenAI
 from src.llm import extract_response_text, get_api_key, get_model
 from src.llm_prompts import TRANSLATE_PROMPT
 from src.llm_prompts import generate_book_info_prompt
-from src.openai_utils import calculate_price
+from src.model_prices import calculate_price
 import tempfile
 
 app = typer.Typer()
@@ -190,10 +192,12 @@ def translate(client: BaseLLM, input_epub_path, output_epub_path, from_chapter=0
 
     for item in book.get_items():
         if item.get_type() == ebooklib.ITEM_DOCUMENT:
+            preserve_head_links(item)
+
             if current_chapter >= from_chapter and current_chapter <= to_chapter:
                 print("Processing chapter %d/%d..." % (current_chapter, chapters_count))
                 soup = BeautifulSoup(item.content, 'html.parser')
-                translated_text = translate_text(client, str(soup), from_lang, to_lang, temp_dir)
+                translated_text = str(soup)
 
                 soup.body.clear()
                 translated_soup = BeautifulSoup(translated_text, 'html.parser')
@@ -207,7 +211,6 @@ def translate(client: BaseLLM, input_epub_path, output_epub_path, from_chapter=0
             current_chapter += 1
 
     epub.write_epub(output_epub_path, book, {})
-
 
 def show_chunks(input_epub_path):
     book = epub.read_epub(input_epub_path)
