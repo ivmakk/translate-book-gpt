@@ -3,6 +3,8 @@ import os
 from dotenv import load_dotenv
 
 from src.epub_utils import preserve_head_links
+from src.epub_utils import get_metadata_author
+from src.epub_utils import get_metadata_title
 from src.html_utils import minify_attributes, restore_attributes
 from src.html_utils import split_html_by_newline
 from src.utils import generate_book_filename
@@ -133,8 +135,8 @@ def translate(client: BaseLLM, input_epub_path, output_epub_path=None, from_chap
 
     book.set_unique_metadata('DC', 'language', langcodes.standardize_tag(to_lang))
 
-    book_title = book.get_metadata('DC', 'title')[0][0] if book.get_metadata('DC', 'title') else None
-    book_author = book.get_metadata('DC', 'creator')[0][0] if book.get_metadata('DC', 'creator') else None
+    book_title = get_metadata_title(book)
+    book_author = get_metadata_author(book)
 
     current_chapter = 1
     chapters_count = len([i for i in book.get_items() if i.get_type() == ebooklib.ITEM_DOCUMENT])

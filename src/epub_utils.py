@@ -26,3 +26,11 @@ def preserve_head_links(item):
     if head:
         for link in head.find_all('link'):
             item.add_link(href=link.get('href'), rel=' '.join(link.get('rel')), type=link.get('type'))
+
+
+def get_metadata_author(book):
+    return book.get_metadata('DC', 'creator')[0][0] if book.get_metadata('DC', 'creator') else None
+
+
+def get_metadata_title(book):
+    return book.get_metadata('DC', 'title')[0][0] if book.get_metadata('DC', 'title') else None
