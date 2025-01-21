@@ -4,6 +4,7 @@ from dotenv import load_dotenv
 
 from src.epub_utils import preserve_head_links
 from src.html_utils import minify_attributes, restore_attributes
+from src.html_utils import split_html_by_newline
 from src.utils import generate_book_filename
 
 load_dotenv()
@@ -31,57 +32,6 @@ MODEL_NAME = os.getenv("MODEL_NAME", "gpt-4o-mini")
 TEMPERATURE = float(os.getenv("TEMPERATURE", 0.2))
 
 MAX_CHUNK_SIZE = int(os.getenv("MAX_CHUNK_SIZE", 10_000))
-
-
-def split_html_by_sentence(html_str, max_chunk_size=MAX_CHUNK_SIZE):
-    sentences = html_str.split('. ')
-
-    chunks = []
-    current_chunk = ""
-
-    for sentence in sentences:
-        if len(current_chunk) + len(sentence) > max_chunk_size:
-            chunks.append(current_chunk)
-            current_chunk = sentence
-        else:
-            current_chunk += '. '
-            current_chunk += sentence
-    
-    if current_chunk:
-        chunks.append(current_chunk)
-
-    # Remove dot from the beginning of first chunk
-    chunks[0] = chunks[0][2:]
-
-    # Add dot to the end of each chunk
-    for i in range(len(chunks)):
-        chunks[i] += '.'
-
-    return chunks
-
-def split_html_by_newline(html_str, max_chunk_size=MAX_CHUNK_SIZE):
-    chunks = []
-    lines = html_str.split('\n')
-
-    if len(html_str) == 0:
-        return chunks
-
-    current_chunk = ""
-
-    for line in lines:
-        if len(current_chunk) + len(line) > max_chunk_size:
-            if current_chunk:
-                chunks.append(current_chunk)
-            current_chunk = line
-        else:
-            if current_chunk:
-                current_chunk += '\n'
-            current_chunk += line
-    
-    if current_chunk:
-        chunks.append(current_chunk)
-
-    return chunks
 
 
 def translate_chunk(client: BaseLLM, text, from_lang='EN', to_lang='PL', book_title=None, book_author=None, retry_num=0):

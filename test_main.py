@@ -1,5 +1,5 @@
 ﻿import pytest
-from main import split_html_by_newline
+from src.html_utils import split_html_by_newline
 
 def test_split_html_by_newline_basic():
     html_str = "This is a line.\nThis is another line."

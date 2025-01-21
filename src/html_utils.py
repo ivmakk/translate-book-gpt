@@ -1,5 +1,7 @@
 ﻿from bs4 import BeautifulSoup
 
+from main import MAX_CHUNK_SIZE
+
 def minify_attributes(html: str):
     """
     Minifies HTML attributes by replacing their values with shorter placeholders.
@@ -76,3 +78,55 @@ def restore_attributes(minified_html: str, attribute_mapping: dict) -> str:
             if value in attribute_mapping:
                 tag[attr] = attribute_mapping[value]
     return str(soup)
+
+
+def split_html_by_sentence(html_str, max_chunk_size=MAX_CHUNK_SIZE):
+    sentences = html_str.split('. ')
+
+    chunks = []
+    current_chunk = ""
+
+    for sentence in sentences:
+        if len(current_chunk) + len(sentence) > max_chunk_size:
+            chunks.append(current_chunk)
+            current_chunk = sentence
+        else:
+            current_chunk += '. '
+            current_chunk += sentence
+
+    if current_chunk:
+        chunks.append(current_chunk)
+
+    # Remove dot from the beginning of first chunk
+    chunks[0] = chunks[0][2:]
+
+    # Add dot to the end of each chunk
+    for i in range(len(chunks)):
+        chunks[i] += '.'
+
+    return chunks
+
+
+def split_html_by_newline(html_str, max_chunk_size=MAX_CHUNK_SIZE):
+    chunks = []
+    lines = html_str.split('\n')
+
+    if len(html_str) == 0:
+        return chunks
+
+    current_chunk = ""
+
+    for line in lines:
+        if len(current_chunk) + len(line) > max_chunk_size:
+            if current_chunk:
+                chunks.append(current_chunk)
+            current_chunk = line
+        else:
+            if current_chunk:
+                current_chunk += '\n'
+            current_chunk += line
+
+    if current_chunk:
+        chunks.append(current_chunk)
+
+    return chunks
