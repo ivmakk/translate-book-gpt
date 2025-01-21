@@ -1,4 +1,4 @@
-# Translate books with GPT
+# Translate books with LLM (OpenAI, Anthropic, Gemini)
 
 ![Supported Python Versions](https://img.shields.io/badge/python-3.8%20%7C%203.9%20%7C%203.10%20%7C%203.11%20%7C%203.12-blue)
 
@@ -7,7 +7,7 @@
 > 
 > This fork of the [original project](https://github.com/jb41/translate-book) does not maintain backward compatibility, as it focuses on developing new features primarily oriented towards the EPUB format.
 
-This project harnesses the power of GPT-4 LLM to translate eBooks from any language into your preferred language, maintaining the integrity and structure of the original content. Imagine having access to a vast world of literature, regardless of the original language, right at your fingertips.
+This project harnesses the power of LLMs (OpenAI, Anthropic, Gemini) to translate eBooks from any language into your preferred language, maintaining the integrity and structure of the original content. Imagine having access to a vast world of literature, regardless of the original language, right at your fingertips.
 
 This tool not only translates the text but also carefully compiles each element of the eBook – chapters, footnotes, and all – into a perfectly formatted EPUB file. Currently supported OpenAI and Anthropic models on both require API keys. However, we understand the need for flexibility, so we've made it easy to switch models in `main.py` according to your specific needs.
 
@@ -77,6 +77,7 @@ All configuration values are defined as environment variables and can be stored 
   - Supported values:
     - For OpenAI : `gpt-4o`, `gpt-4o-mini`, `o1-mini` (see [full list](https://platform.openai.com/docs/models))
     - For Anthropic : `claude-2`, `claude-instant-1` (see [full list](https://docs.anthropic.com/en/docs/about-claude/models))
+    - For Gemini : `gemini-1.5-pro`, `gemini-1.5-flash`, `gemini-2.0-flash-exp` (see [full list](https://ai.google.dev/gemini-api/docs/models/gemini))
   - Default: `gpt-4o-mini`
 
 - `TEMPERATURE`: Controls randomness in model responses. Lower values are more focused/deterministic
