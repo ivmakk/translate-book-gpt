@@ -3,6 +3,7 @@ import os
 from dotenv import load_dotenv
 
 from src.epub_utils import preserve_head_links
+from src.html_utils import minify_attributes, restore_attributes
 
 load_dotenv()
 
@@ -15,7 +16,6 @@ import re
 import ebooklib
 from ebooklib import epub
 from bs4 import BeautifulSoup
-from openai import OpenAI
 
 from src.llm import extract_response_text, get_api_key, get_model
 from src.llm_prompts import TRANSLATE_PROMPT
@@ -95,7 +95,8 @@ def translate_chunk(client: BaseLLM, text, from_lang='EN', to_lang='PL', book_ti
         from_lang=full_from_lang,
         to_lang=full_to_lang,
         book_details=generate_book_info_prompt(book_title, book_author),
-        source_text=html.escape(text)
+        # source_text=html.escape(text)
+        source_text=text
     )
 
     response = client.invoke(messages)
@@ -151,7 +152,14 @@ def translate_toc(client: BaseLLM, toc, from_lang='EN', to_lang='PL'):
 
 def translate_text(client: BaseLLM, text, from_lang='EN', to_lang='PL', temp_dir=None, book_title=None, book_author=None):
     translated_chunks = []
-    chunks = split_html_by_newline(text)
+
+    soup = BeautifulSoup(text, 'html.parser')
+
+    if not soup.body:
+        return text
+
+    minified_html, mininifed_mapping = minify_attributes(str(soup.body))
+    chunks = split_html_by_newline(minified_html)
 
     for i, chunk in enumerate(chunks):
         print("\tTranslating chunk %d/%d..." % (i+1, len(chunks)))
@@ -161,7 +169,12 @@ def translate_text(client: BaseLLM, text, from_lang='EN', to_lang='PL', temp_dir
             with open(os.path.join(temp_dir, 'translated_text_%d.txt' % i), 'w', encoding='utf-8') as f:
                 f.write(translated_chunks[-1])
 
-    return ' '.join(translated_chunks)
+    translated_restored_html = restore_attributes("".join(translated_chunks), mininifed_mapping)
+    
+    soup.body.clear()
+    soup.body.extend(BeautifulSoup(translated_restored_html, 'html.parser').body.contents)
+
+    return str(soup)
 
 
 def translate(client: BaseLLM, input_epub_path, output_epub_path, from_chapter=0, to_chapter=9999, from_lang='EN', to_lang='PL', toc=True):
@@ -197,16 +210,8 @@ def translate(client: BaseLLM, input_epub_path, output_epub_path, from_chapter=0
             if current_chapter >= from_chapter and current_chapter <= to_chapter:
                 print("Processing chapter %d/%d..." % (current_chapter, chapters_count))
                 soup = BeautifulSoup(item.content, 'html.parser')
-                translated_text = str(soup)
-
-                soup.body.clear()
-                translated_soup = BeautifulSoup(translated_text, 'html.parser')
-                soup.body.extend(translated_soup.body.contents)
-
-                if soup.title and translated_soup.title:
-                    soup.title.string = translated_soup.title.string
-
-                item.content = str(soup).encode('utf-8')
+                translated_text = translate_text(client, str(soup), from_lang, to_lang, temp_dir)
+                item.content = translated_text.encode('utf-8')
 
             current_chapter += 1
 

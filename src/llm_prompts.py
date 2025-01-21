@@ -35,6 +35,6 @@ def generate_book_info_prompt(book_title, book_author):
         book_details += f"The book author is '{book_author}'. \n"
 
     if book_title or book_author:
-        book_details += "Rely on your knowledge of the author and book to determine the appropriate tone and style for the translation. \n"
+        book_details += "Rely on your knowledge of the author and book to determine the appropriate tone and style for the translation. "
 
     return book_details
