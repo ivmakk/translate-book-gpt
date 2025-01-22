@@ -1,6 +1,7 @@
-﻿from bs4 import BeautifulSoup
+﻿import os
+from bs4 import BeautifulSoup
 
-from main import MAX_CHUNK_SIZE
+MAX_CHUNK_SIZE = int(os.getenv("MAX_CHUNK_SIZE", 10_000))
 
 def minify_attributes(html: str):
     """
