@@ -1,5 +1,7 @@
-﻿from typing import List, Set
+﻿import os
+from typing import List, Set
 
+import langcodes
 from unidecode import unidecode
 
 
@@ -69,3 +71,15 @@ def sanitize_text(filename: str, allowed_chars: Set[str] | None = None) -> str:
         )
 
     return "".join(c if c in allowed_chars else "-" for c in latin_filename)
+
+
+def save_chunk_to_file(temp_dir, chapter_number, translated_chunks, i):
+    if temp_dir:
+        filename = f'translated_text_{chapter_number}_{i}.html' if chapter_number else f'translated_text_{i}.html'
+
+        with open(os.path.join(temp_dir, filename), 'w', encoding='utf-8') as f:
+            f.write(translated_chunks[-1])
+
+
+def lang_code_to_full_lang(from_lang):
+    return langcodes.Language.make(from_lang.lower()).display_name()

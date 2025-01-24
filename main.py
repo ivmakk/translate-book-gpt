@@ -8,6 +8,8 @@ from src.epub_utils import get_metadata_title
 from src.html_utils import minify_attributes, restore_attributes
 from src.html_utils import split_html_by_newline
 from src.utils import generate_book_filename
+from src.utils import save_chunk_to_file
+from src.utils import lang_code_to_full_lang
 
 load_dotenv()
 
@@ -36,17 +38,14 @@ TEMPERATURE = float(os.getenv("TEMPERATURE", 0.2))
 MAX_CHUNK_SIZE = int(os.getenv("MAX_CHUNK_SIZE", 10_000))
 
 
-def translate_chunk(client: BaseLLM, text, from_lang='EN', to_lang='PL', book_title=None, book_author=None, retry_num=0):
+def translate_chunk(client: BaseLLM, text, from_lang, to_lang, book_title=None, book_author=None, retry_num=0):
     RETRY_LIMIT = 3
     MAX_LINE_DIFF_PERCENTAGE = 0.1
     MIN_LINES_FOR_RETRY = 10
 
-    full_from_lang = langcodes.Language.make(from_lang.lower()).display_name()
-    full_to_lang = langcodes.Language.make(to_lang.lower()).display_name()
-
     messages = TRANSLATE_PROMPT.format_messages(
-        from_lang=full_from_lang,
-        to_lang=full_to_lang,
+        from_lang=from_lang,
+        to_lang=to_lang,
         book_details=generate_book_info_prompt(book_title, book_author),
         # source_text=html.escape(text)
         source_text=text
@@ -88,10 +87,10 @@ def translate_chunk(client: BaseLLM, text, from_lang='EN', to_lang='PL', book_ti
 def translate_toc(client: BaseLLM, toc, from_lang='EN', to_lang='PL'):
     toc_list = list(toc)
     toc_text = "\n".join([item.title.strip() for item in toc_list if isinstance(item, epub.Link)])
-    
+
     translated_toc_text = translate_text(client, toc_text, from_lang, to_lang)
     translated_titles = [title.strip() for title in translated_toc_text.split('\n')]
-    
+
     translated_toc = []
     title_index = 0
     for item in toc_list:
@@ -100,10 +99,36 @@ def translate_toc(client: BaseLLM, toc, from_lang='EN', to_lang='PL'):
             title_index += 1
         else:
             translated_toc.append(item)
-    
+
     return tuple(translated_toc)
 
-def translate_text(client: BaseLLM, text, from_lang='EN', to_lang='PL', temp_dir=None, book_title=None, book_author=None):
+
+def translate_text(
+    client: BaseLLM,
+    text,
+    from_lang,
+    to_lang,
+    temp_dir=None,
+    book_title=None,
+    book_author=None,
+    chapter_number=None,
+):
+    """
+    Translates HTML text content from one language to another while preserving HTML structure.
+
+    Args:
+        client (BaseLLM): The language model client used for translation
+        text (str): The HTML text content to translate
+        from_lang (str): Source language code
+        to_lang (str): Target language code
+        temp_dir (str, optional): Directory to save intermediate translation chunks. Defaults to None
+        book_title (str, optional): Title of the book being translated. Defaults to None
+        book_author (str, optional): Author of the book being translated. Defaults to None
+        chapter_number (int, optional): Current chapter number being translated. Defaults to None
+
+    Returns:
+        str: The translated HTML text with preserved structure
+    """
     translated_chunks = []
 
     soup = BeautifulSoup(text, 'html.parser')
@@ -118,20 +143,20 @@ def translate_text(client: BaseLLM, text, from_lang='EN', to_lang='PL', temp_dir
         print("\tTranslating chunk %d/%d..." % (i+1, len(chunks)))
         translated_chunks.append(translate_chunk(client, chunk, from_lang, to_lang, book_title, book_author))
 
-        if temp_dir:
-            with open(os.path.join(temp_dir, 'translated_text_%d.txt' % i), 'w', encoding='utf-8') as f:
-                f.write(translated_chunks[-1])
+        save_chunk_to_file(temp_dir, chapter_number, translated_chunks, i)
 
     translated_restored_html = restore_attributes("".join(translated_chunks), mininifed_mapping)
-    
+
     soup.body.clear()
     soup.body.extend(BeautifulSoup(translated_restored_html, 'html.parser').body.contents)
 
     return str(soup)
 
-
 def translate(client: BaseLLM, input_epub_path, output_epub_path=None, from_chapter=0, to_chapter=9999, from_lang='EN', to_lang='PL', toc=True):
     book = epub.read_epub(input_epub_path)
+
+    full_from_lang = lang_code_to_full_lang(from_lang)
+    full_to_lang = lang_code_to_full_lang(to_lang)
 
     book.set_unique_metadata('DC', 'language', langcodes.standardize_tag(to_lang))
 
@@ -145,8 +170,8 @@ def translate(client: BaseLLM, input_epub_path, output_epub_path=None, from_chap
     print("Debugging: Translated chunks will be stored in the temporary directory: %s" % temp_dir)
 
     prompt = TRANSLATE_PROMPT.format_messages(
-        from_lang=from_lang,
-        to_lang=to_lang,
+        from_lang=full_from_lang,
+        to_lang=full_to_lang,
         book_details=generate_book_info_prompt(book_title, book_author),
         source_text="..."
     )[0].content
@@ -163,7 +188,14 @@ def translate(client: BaseLLM, input_epub_path, output_epub_path=None, from_chap
             if current_chapter >= from_chapter and current_chapter <= to_chapter:
                 print("Processing chapter %d/%d..." % (current_chapter, chapters_count))
                 soup = BeautifulSoup(item.content, 'html.parser')
-                translated_text = translate_text(client, str(soup), from_lang, to_lang, temp_dir)
+                translated_text = translate_text(
+                    client=client,
+                    text=str(soup),
+                    from_lang=full_from_lang,
+                    to_lang=full_to_lang,
+                    temp_dir=temp_dir,
+                    chapter_number=current_chapter,
+                )
                 item.content = translated_text.encode('utf-8')
 
             current_chapter += 1
