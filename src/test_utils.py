@@ -10,7 +10,7 @@ def test_generate_book_filename_with_all_params():
         book_title="The Great Gatsby",
         book_author="F. Scott Fitzgerald"
     )
-    assert filename == "the-great-gatsby_f.-scott-fitzgerald_gpt-4_t0.7_es.epub"
+    assert filename == "f.-scott-fitzgerald.the-great-gatsby.gpt-4.t0.7.es.epub"
 
 
 def test_generate_book_filename_without_author():
@@ -20,7 +20,7 @@ def test_generate_book_filename_without_author():
         temperature=0.8,
         book_title="Don Quixote"
     )
-    assert filename == "don-quixote_gpt-3.5_t0.8_fr.epub"
+    assert filename == "don-quixote.gpt-3.5.t0.8.fr.epub"
 
 
 def test_generate_book_filename_without_title():
@@ -30,7 +30,7 @@ def test_generate_book_filename_without_title():
         temperature=0.9,
         book_author="Miguel de Cervantes"
     )
-    assert filename == "miguel-de-cervantes_gpt-4_t0.9_de.epub"
+    assert filename == "miguel-de-cervantes.gpt-4.t0.9.de.epub"
 
 
 def test_generate_book_filename_without_title_and_author():
@@ -39,7 +39,7 @@ def test_generate_book_filename_without_title_and_author():
         model="gpt-3.5",
         temperature=0.6
     )
-    assert filename == "untitled_gpt-3.5_t0.6_it.epub"
+    assert filename == "untitled.gpt-3.5.t0.6.it.epub"
 
 
 def test_sanitize_with_special_chars():
@@ -59,4 +59,4 @@ def test_sanitize_with_spaces():
 
 def test_sanitize_with_unicode():
     filename = sanitize_text("café.txt")
-    assert filename == "caf-.txt" 
+    assert filename == "caf-.txt"

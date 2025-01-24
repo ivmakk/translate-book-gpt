@@ -29,17 +29,17 @@ def generate_book_filename(
     """
     parts: List[str] = []
 
-    if book_title:
-        parts.append(book_title)
     if book_author:
         parts.append(book_author)
+    if book_title:
+        parts.append(book_title)
 
     if not book_author and not book_title:
         parts.append("untitled")
 
     parts.extend([model, f"t{temperature}", to_lang])
 
-    return sanitize_text("_".join(parts)).lower() + ".epub"
+    return sanitize_text(".".join(parts)).lower() + ".epub"
 
 def sanitize_text(filename: str, allowed_chars: str = None) -> str:
     if not allowed_chars:

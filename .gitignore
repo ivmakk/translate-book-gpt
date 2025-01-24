@@ -255,7 +255,8 @@ $RECYCLE.BIN/
 
 
 ## Custom
-/tmp
+tmp/
+.github/
 config.yaml
 config.yml
 books/
