@@ -78,6 +78,7 @@ All configuration values are defined as environment variables and can be stored 
     - For OpenAI : `gpt-4o`, `gpt-4o-mini`, `o1-mini` (see [full list](https://platform.openai.com/docs/models))
     - For Anthropic : `claude-2`, `claude-instant-1` (see [full list](https://docs.anthropic.com/en/docs/about-claude/models))
     - For Gemini : `gemini-1.5-pro`, `gemini-1.5-flash`, `gemini-2.0-flash-exp` (see [full list](https://ai.google.dev/gemini-api/docs/models/gemini))
+    - For DeepSeek : `deepseek-chat` (see [full list](https://api-docs.deepseek.com/quick_start/pricing))
   - Default: `gpt-4o-mini`
 
 - `TEMPERATURE`: Controls randomness in model responses. Lower values are more focused/deterministic
@@ -89,6 +90,8 @@ All configuration values are defined as environment variables and can be stored 
 - `ANTHROPIC_API_KEY`: Your Anthropic API key. Required when using Anthropic models.
 
 - `GEMINI_API_KEY`: Your Gemini API key. Required when using Gemini models.
+
+- `DEEPSEEK_API_KEY`: Your DeepSeek API key. Required when using DeepSeek models.
 
 ### Translation Tunning
 
