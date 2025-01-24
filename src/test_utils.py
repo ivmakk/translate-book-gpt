@@ -44,7 +44,7 @@ def test_generate_book_filename_without_title_and_author():
 
 def test_sanitize_with_special_chars():
     filename = sanitize_text("Hello! @World% (2023)")
-    assert filename == "Hello---World---2023-"
+    assert filename == "Hello---World--(2023)"
 
 
 def test_sanitize_with_allowed_chars():
@@ -59,4 +59,13 @@ def test_sanitize_with_spaces():
 
 def test_sanitize_with_unicode():
     filename = sanitize_text("café.txt")
-    assert filename == "caf-.txt"
+    assert filename == "cafe.txt"
+
+def test_sanitize_text_with_cyrillic():
+    assert sanitize_text("Здраво свет") == "Zdravo-svet"
+
+def test_sanitize_text_with_diacritics():
+    assert sanitize_text("café études") == "cafe-etudes"
+
+def test_sanitize_text_with_chinese():
+    assert sanitize_text("你好世界") == "Ni-Hao-Shi-Jie-"

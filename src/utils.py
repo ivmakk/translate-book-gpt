@@ -1,4 +1,6 @@
-﻿from typing import List
+﻿from typing import List, Set
+
+from unidecode import unidecode
 
 
 def generate_book_filename(
@@ -25,7 +27,7 @@ def generate_book_filename(
 
     Example:
         >>> generate_book_filename("es", "gpt-4", 0.7, "Don Quixote", "Cervantes")
-        "don-quixote_cervantes_gpt-4_t0.7_es.epub"
+        'cervantes.don-quixote.gpt-4.t0.7.es.epub'
     """
     parts: List[str] = []
 
@@ -41,10 +43,29 @@ def generate_book_filename(
 
     return sanitize_text(".".join(parts)).lower() + ".epub"
 
-def sanitize_text(filename: str, allowed_chars: str = None) -> str:
+def sanitize_text(filename: str, allowed_chars: Set[str] | None = None) -> str:
+    """
+    Sanitizes a filename by transliterating non-Latin characters to ASCII and removing disallowed characters.
+    Args:
+        filename (str): The filename to sanitize.
+        allowed_chars (Set[str] | None, optional): Set of allowed characters in the filename. 
+            If None, defaults to alphanumeric characters plus dots, underscores and hyphens. 
+            Defaults to None.
+    Returns:
+        str: The sanitized filename containing only allowed characters, with disallowed characters 
+            replaced by hyphens.
+    Example:
+        >>> sanitize_text("héllo wörld.txt")
+        'hello-world.txt'
+        >>> sanitize_text("test@file.txt")
+        'test-file.txt'
+    """
+    # Transliterate non-Latin characters to ASCII
+    latin_filename = unidecode(filename)
+    
     if not allowed_chars:
         allowed_chars = set(
-            "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._-"
+            "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._-()[]"
         )
 
-    return "".join(c if c in allowed_chars else "-" for c in filename)
+    return "".join(c if c in allowed_chars else "-" for c in latin_filename)
