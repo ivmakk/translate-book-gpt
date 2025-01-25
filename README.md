@@ -7,7 +7,7 @@
 > 
 > This fork of the [original project](https://github.com/jb41/translate-book) does not maintain backward compatibility, as it focuses on developing new features primarily oriented towards the EPUB format.
 
-This project harnesses the power of LLMs (OpenAI, Anthropic, Gemini) to translate eBooks from any language into your preferred language, maintaining the integrity and structure of the original content. Imagine having access to a vast world of literature, regardless of the original language, right at your fingertips.
+This project harnesses the power of LLMs (OpenAI, Anthropic, Gemini, DeepSeek) to translate eBooks from any language into your preferred language, maintaining the integrity and structure of the original content. Imagine having access to a vast world of literature, regardless of the original language, right at your fingertips.
 
 This tool not only translates the text but also carefully compiles each element of the eBook – chapters, footnotes, and all – into a perfectly formatted EPUB file. Currently supported OpenAI and Anthropic models on both require API keys. However, we understand the need for flexibility, so we've made it easy to switch models in `main.py` according to your specific needs.
 
@@ -70,7 +70,7 @@ python main.py translate --input yourbook.epub --output translatedbook.epub --fr
 All configuration values are defined as environment variables and can be stored in `.env` file.
 
 - `MODEL_VENDOR`: The AI model provider
-  - Supported values: `openai`, `anthropic`
+  - Supported values: `openai`, `anthropic`, `google`, `deepseek`
   - Default: `openai`
 
 - `MODEL_NAME`: Name of the model to use
