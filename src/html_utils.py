@@ -1,4 +1,5 @@
-﻿import os
+﻿import html
+import os
 from bs4 import BeautifulSoup
 
 MAX_CHUNK_SIZE = int(os.getenv("MAX_CHUNK_SIZE", 10_000))
@@ -131,3 +132,10 @@ def split_html_by_newline(html_str, max_chunk_size=MAX_CHUNK_SIZE):
         chunks.append(current_chunk)
 
     return chunks
+
+
+def extract_text_from_html(html_str):
+    soup = BeautifulSoup(html_str, 'html.parser')
+
+    return str(soup.get_text(separator=' ', strip=True)).strip()
+

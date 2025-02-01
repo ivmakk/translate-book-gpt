@@ -1,11 +1,13 @@
 import html
+import json
 import os
 from dotenv import load_dotenv
 
 from src.epub_utils import preserve_head_links
 from src.epub_utils import get_metadata_author
 from src.epub_utils import get_metadata_title
-from src.html_utils import minify_attributes, restore_attributes
+from src.glossary import extract_glossary
+from src.html_utils import extract_text_from_html, minify_attributes, restore_attributes
 from src.html_utils import split_html_by_newline
 from src.utils import generate_book_filename
 from src.utils import save_chunk_to_file
@@ -188,16 +190,21 @@ def translate(client: BaseLLM, input_epub_path, output_epub_path=None, from_chap
             if current_chapter >= from_chapter and current_chapter <= to_chapter:
                 print("Processing chapter %d/%d..." % (current_chapter, chapters_count))
                 soup = BeautifulSoup(item.content, 'html.parser')
-                translated_text = translate_text(
-                    client=client,
-                    text=str(soup),
-                    from_lang=full_from_lang,
-                    to_lang=full_to_lang,
-                    temp_dir=temp_dir,
-                    chapter_number=current_chapter,
-                )
-                item.content = translated_text.encode('utf-8')
-
+                
+                try:
+                    translated_text = translate_text(
+                        client=client,
+                        text=str(soup),
+                        from_lang=full_from_lang,
+                        to_lang=full_to_lang,
+                        temp_dir=temp_dir,
+                        chapter_number=current_chapter,
+                    )
+                    item.content = translated_text.encode('utf-8')
+                except Exception as e:
+                    print(f"Error translating chapter {current_chapter}: {str(e)}")
+                    break
+                
             current_chapter += 1
 
     if not output_epub_path:
@@ -270,6 +277,29 @@ def show_chapters(input_epub_path):
 
             current_chapter += 1
 
+def extract_glossary_to_file(input_epub_path, from_lang="en"):
+    book = epub.read_epub(input_epub_path)
+    epub_content = [extract_text_from_html(str(item.content)) for item in book.get_items() if item.get_type() == ebooklib.ITEM_DOCUMENT]
+    glossary = extract_glossary(epub_content, from_lang, min_count=5)
+    
+    # Save glossary to JSON file
+    output_filename = os.path.splitext(input_epub_path)[0] + '_glossary.json'
+    
+    # Convert sets to lists for JSON serialization
+    json_glossary = {
+        "PERSON": list(glossary["PERSON"]),
+        "ORG": list(glossary["ORG"]), 
+        "GPE": list(glossary["GPE"]),
+        "REPEATED": dict(glossary["REPEATED"])
+    }
+
+    print(json_glossary)
+    
+    with open(output_filename, 'w', encoding='utf-8') as f:
+        json.dump(json_glossary, f, ensure_ascii=False, indent=4)
+    
+    print(f"\nGlossary saved to: {output_filename}")
+
 @app.command('translate', help="Translate the book.")
 def translate_command(
     input: str = typer.Option(..., help="Input file path."),
@@ -290,6 +320,15 @@ def show_chapters_command(input: str = typer.Option(..., help="Input file path."
 @app.command('show-chunks', help="Show the chunks of the book chapters and estimated prices for each.")
 def show_chunks_command(input: str = typer.Option(..., help="Input file path.")):
     show_chunks(input)
+
+
+@app.command("extract-glossary", help="Extract glossary terms from the book.")
+def extract_glossary_command(
+    input: str = typer.Option(..., help="Input file path."),
+    from_lang: str = typer.Option("en", help="Source language."),
+):
+    extract_glossary_to_file(input, from_lang)
+
 
 if __name__ == "__main__":
     app()
