@@ -1,7 +1,11 @@
 import html
 import os
 from dotenv import load_dotenv
-
+import faiss
+from langchain.vectorstores import FAISS
+from langchain_community.embeddings import OpenAIEmbeddings
+from langchain.memory import VectorStoreRetrieverMemory
+from langchain_community.docstore.in_memory import InMemoryDocstore
 from src.epub_utils import preserve_head_links
 from src.epub_utils import get_metadata_author
 from src.epub_utils import get_metadata_title
@@ -38,18 +42,25 @@ TEMPERATURE = float(os.getenv("TEMPERATURE", 0.2))
 MAX_CHUNK_SIZE = int(os.getenv("MAX_CHUNK_SIZE", 10_000))
 
 
-def translate_chunk(client: BaseLLM, text, from_lang, to_lang, book_title=None, book_author=None, retry_num=0):
+def translate_chunk(client: BaseLLM, text, from_lang, to_lang, book_title=None, book_author=None, retry_num=0, memory=None):
     RETRY_LIMIT = 3
     MAX_LINE_DIFF_PERCENTAGE = 0.1
     MIN_LINES_FOR_RETRY = 10
+    
+    if memory:
+        memory_context = memory.load_memory_variables({"prompt": text}).get("history", "")
+    else:
+        memory_context = ""
 
     messages = TRANSLATE_PROMPT.format_messages(
         from_lang=from_lang,
         to_lang=to_lang,
         book_details=generate_book_info_prompt(book_title, book_author),
+        previous_context=memory_context,
         # source_text=html.escape(text)
-        source_text=text
+        source_text=text,
     )
+
 
     response = client.invoke(messages)
     print("\t\t" + str(response.usage_metadata))
@@ -78,8 +89,14 @@ def translate_chunk(client: BaseLLM, text, from_lang, to_lang, book_title=None, 
                 to_lang=to_lang, 
                 book_title=book_title, 
                 book_author=book_author, 
-                retry_num=retry_num + 1
+                retry_num=retry_num + 1,
+                memory=memory
             )
+
+    if memory:
+        soup = BeautifulSoup(translated_text, 'html.parser')
+        text_only = soup.get_text(separator="\n", strip=True)
+        memory.save_context({}, {"history": text_only})
 
     return decoded_text
 
@@ -112,6 +129,7 @@ def translate_text(
     book_title=None,
     book_author=None,
     chapter_number=None,
+    memory=None
 ):
     """
     Translates HTML text content from one language to another while preserving HTML structure.
@@ -141,8 +159,7 @@ def translate_text(
 
     for i, chunk in enumerate(chunks):
         print("\tTranslating chunk %d/%d..." % (i+1, len(chunks)))
-        translated_chunks.append(translate_chunk(client, chunk, from_lang, to_lang, book_title, book_author))
-
+        translated_chunks.append(translate_chunk(client, chunk, from_lang, to_lang, book_title, book_author, memory=memory))
         save_chunk_to_file(temp_dir, chapter_number, translated_chunks, i)
 
     translated_restored_html = restore_attributes("".join(translated_chunks), mininifed_mapping)
@@ -153,6 +170,14 @@ def translate_text(
     return str(soup)
 
 def translate(client: BaseLLM, input_epub_path, output_epub_path=None, from_chapter=0, to_chapter=9999, from_lang='EN', to_lang='PL', toc=True):
+    embeddings = OpenAIEmbeddings()
+    dimension = 1536  # OpenAI embeddings dimension
+    index = faiss.IndexFlatL2(dimension)
+    vectorstore = FAISS(embedding_function=embeddings, index=index, docstore=InMemoryDocstore(), index_to_docstore_id={})
+    retriever = vectorstore.as_retriever(search_kwargs={"k": 2, "score_threshold": 0.8})
+
+    memory = VectorStoreRetrieverMemory(retriever=retriever, memory_key="history", maximal_marginal_relevance=True)
+
     book = epub.read_epub(input_epub_path)
 
     full_from_lang = lang_code_to_full_lang(from_lang)
@@ -173,7 +198,8 @@ def translate(client: BaseLLM, input_epub_path, output_epub_path=None, from_chap
         from_lang=full_from_lang,
         to_lang=full_to_lang,
         book_details=generate_book_info_prompt(book_title, book_author),
-        source_text="..."
+        source_text="...",
+        previous_context="..."
     )[0].content
     indented_prompt = '\n'.join(['\t' + line for line in prompt.split('\n')])
     print("Prompt sample: \n%s" % indented_prompt)
@@ -195,6 +221,7 @@ def translate(client: BaseLLM, input_epub_path, output_epub_path=None, from_chap
                     to_lang=full_to_lang,
                     temp_dir=temp_dir,
                     chapter_number=current_chapter,
+                    memory=memory
                 )
                 item.content = translated_text.encode('utf-8')
 
@@ -245,14 +272,20 @@ def show_chunks(input_epub_path):
             input_price = calculate_price(document_total_tokens, MODEL_NAME, 'input')
             output_price = calculate_price(document_total_tokens, MODEL_NAME, 'output')
             total_price = input_price + output_price
-            print("Price for input: $%.2f, Price for output: $%.2f, Total price: $%.2f" % (input_price, output_price, total_price))
+
+            if total_price > 0:
+                print("Price for input: $%.2f, Price for output: $%.2f, Total price: $%.2f" % (input_price, output_price, total_price))
             
             print("--------------------------------------------------\n")
 
     input_price = calculate_price(book_total_tokens, MODEL_NAME, 'input')
     output_price = calculate_price(book_total_tokens, MODEL_NAME, 'output')
     total_price = input_price + output_price
-    print("Total book price for input: $%.2f, Price for output: $%.2f, Total price: $%.2f" % (input_price, output_price, total_price))
+    
+    print(f"Book total tokens: {book_total_tokens}")
+
+    if total_price > 0:
+        print("Total book price for input: $%.2f, Price for output: $%.2f, Total price: $%.2f" % (input_price, output_price, total_price))
 
 def show_chapters(input_epub_path):
     book = epub.read_epub(input_epub_path)

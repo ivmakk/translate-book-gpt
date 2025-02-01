@@ -1,7 +1,11 @@
 ﻿from langchain_core.prompts import ChatPromptTemplate
 
 TRANSLATE_PROMPT_SYSTEM = \
-"""You are a professional book translator and {to_lang} native speaker.
+"""
+Previous Context:
+{previous_context}
+
+You are a professional book translator and {to_lang} native speaker.
 Please translate the text from {from_lang} to {to_lang}.
 {book_details}
 Keep all special characters and HTML tags as in the source text.
