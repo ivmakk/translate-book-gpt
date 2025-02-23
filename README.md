@@ -98,6 +98,9 @@ All configuration values are defined as environment variables and can be stored 
 - `MAX_CHUNK_SIZE`: Maximum size of the chunk to translate. Adjust this based on max output tokens of the model (e.g. for Anthropic models with 4096 tokens limit, set chunk size to ~5000).
   - Default: `10_000` 
 
+- `RETRY_LIMIT`: Maximum number of attempts to retry failed or partial translations, helping handle rate limits and API issues; set to 0 to minimize costs and debug failures.
+  - Default: `1`
+
 ## Models Differences
 
 ### Tokens Usage

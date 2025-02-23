@@ -5,9 +5,9 @@ from dotenv import load_dotenv
 from src.epub_utils import preserve_head_links
 from src.epub_utils import get_metadata_author
 from src.epub_utils import get_metadata_title
-from src.html_utils import minify_attributes, restore_attributes
+from src.html_utils import format_html_to_multiline_block_tags, minify_attributes, restore_attributes
 from src.html_utils import split_html_by_newline
-from src.utils import generate_book_filename
+from src.utils import generate_book_filename, truncate_text
 from src.utils import save_chunk_to_file
 from src.utils import lang_code_to_full_lang
 
@@ -34,12 +34,12 @@ app = typer.Typer()
 MODEL_VENDOR = os.getenv("MODEL_VENDOR", "openai")
 MODEL_NAME = os.getenv("MODEL_NAME", "gpt-4o-mini")
 TEMPERATURE = float(os.getenv("TEMPERATURE", 0.2))
+RETRY_LIMIT = int(os.getenv("RETRY_LIMIT", 1))
 
 MAX_CHUNK_SIZE = int(os.getenv("MAX_CHUNK_SIZE", 10_000))
 
 
 def translate_chunk(client: BaseLLM, text, from_lang, to_lang, book_title=None, book_author=None, retry_num=0):
-    RETRY_LIMIT = 3
     MAX_LINE_DIFF_PERCENTAGE = 0.1
     MIN_LINES_FOR_RETRY = 10
 
@@ -60,8 +60,10 @@ def translate_chunk(client: BaseLLM, text, from_lang, to_lang, book_title=None, 
     original_lines = text.count('\n')
     decoded_lines = decoded_text.count('\n')
 
-    if abs(original_lines - decoded_lines) > 1:
-        print(f"Warning: The number of lines in the original text ({original_lines}) and the decoded text ({decoded_lines}) are different.")
+    if abs(original_lines - decoded_lines) > 2:
+        print(f"\t\tWarning: The number of lines in the original text ({original_lines}) and the decoded text ({decoded_lines}) are different.")
+        print("\t\t\tOriginal last line:", truncate_text(text.splitlines()[-1]))
+        print("\t\t\tTranslated last line:", truncate_text(decoded_text.splitlines()[-1]))
 
         should_retry = (
             retry_num < RETRY_LIMIT and 
@@ -70,7 +72,7 @@ def translate_chunk(client: BaseLLM, text, from_lang, to_lang, book_title=None, 
         )
 
         if should_retry:
-            print(f"Retrying translation... Attempt {retry_num + 1}/{RETRY_LIMIT}")
+            print(f"\t\tRetrying translation... Attempt {retry_num + 1} of {RETRY_LIMIT}")
             return translate_chunk(
                 client=client,
                 text=text, 
@@ -81,7 +83,7 @@ def translate_chunk(client: BaseLLM, text, from_lang, to_lang, book_title=None, 
                 retry_num=retry_num + 1
             )
 
-    return decoded_text
+    return decoded_text, text
 
 
 def translate_toc(client: BaseLLM, toc, from_lang='EN', to_lang='PL'):
@@ -141,9 +143,11 @@ def translate_text(
 
     for i, chunk in enumerate(chunks):
         print("\tTranslating chunk %d/%d..." % (i+1, len(chunks)))
-        translated_chunks.append(translate_chunk(client, chunk, from_lang, to_lang, book_title, book_author))
+        translated_chunk, original_chunk = translate_chunk(client, chunk, from_lang, to_lang, book_title, book_author)
+        translated_chunks.append(translated_chunk)
 
-        save_chunk_to_file(temp_dir, chapter_number, translated_chunks, i)
+        save_chunk_to_file(temp_dir, chapter_number, restore_attributes(original_chunk, mininifed_mapping), i, prefix='original')
+        save_chunk_to_file(temp_dir, chapter_number, restore_attributes(translated_chunk, mininifed_mapping), i)
 
     translated_restored_html = restore_attributes("".join(translated_chunks), mininifed_mapping)
 
@@ -188,16 +192,21 @@ def translate(client: BaseLLM, input_epub_path, output_epub_path=None, from_chap
             if current_chapter >= from_chapter and current_chapter <= to_chapter:
                 print("Processing chapter %d/%d..." % (current_chapter, chapters_count))
                 soup = BeautifulSoup(item.content, 'html.parser')
-                translated_text = translate_text(
-                    client=client,
-                    text=str(soup),
-                    from_lang=full_from_lang,
-                    to_lang=full_to_lang,
-                    temp_dir=temp_dir,
-                    chapter_number=current_chapter,
-                )
-                item.content = translated_text.encode('utf-8')
-
+                
+                try:
+                    translated_text = translate_text(
+                        client=client,
+                        text=format_html_to_multiline_block_tags(str(soup)),
+                        from_lang=full_from_lang,
+                        to_lang=full_to_lang,
+                        temp_dir=temp_dir,
+                        chapter_number=current_chapter,
+                    )
+                    item.content = translated_text.encode('utf-8')
+                except Exception as e:
+                    print(f"\t\tError translating chapter {current_chapter}: {str(e)}")
+                    break
+   
             current_chapter += 1
 
     if not output_epub_path:

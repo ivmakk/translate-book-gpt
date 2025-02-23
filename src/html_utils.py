@@ -131,3 +131,17 @@ def split_html_by_newline(html_str, max_chunk_size=MAX_CHUNK_SIZE):
         chunks.append(current_chunk)
 
     return chunks
+
+
+def format_html_to_multiline_block_tags(html: str) -> str:
+    block_tags = ['p', 'div', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6']
+    formatted = html
+    
+    for tag in block_tags:
+        formatted = formatted.replace(f'</{tag}>', f'</{tag}>\n')
+    
+    # Remove any double newlines that may have been created
+    while '\n\n' in formatted:
+        formatted = formatted.replace('\n\n', '\n')
+        
+    return formatted

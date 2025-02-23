@@ -73,13 +73,30 @@ def sanitize_text(filename: str, allowed_chars: Set[str] | None = None) -> str:
     return "".join(c if c in allowed_chars else "-" for c in latin_filename)
 
 
-def save_chunk_to_file(temp_dir, chapter_number, translated_chunks, i):
-    if temp_dir:
-        filename = f'translated_text_{chapter_number}_{i}.html' if chapter_number else f'translated_text_{i}.html'
+def save_chunk_to_file(dir_path, chapter_number, content, i, prefix='translated_text'):
+    if dir_path:
+        filename = f'{prefix}_{chapter_number}_{i}.html' if chapter_number else f'{prefix}_{i}.html'
 
-        with open(os.path.join(temp_dir, filename), 'w', encoding='utf-8') as f:
-            f.write(translated_chunks[-1])
+        with open(os.path.join(dir_path, filename), 'w', encoding='utf-8') as f:
+            f.write(content)
 
 
 def lang_code_to_full_lang(from_lang):
     return langcodes.Language.make(from_lang.lower()).display_name()
+
+
+def truncate_text(text: str, max_length: int = 100, ellipsis: str = "...") -> str:
+    """
+    Truncates text to specified length and adds ellipsis if needed.
+    
+    Args:
+        text: Text to truncate
+        max_length: Maximum length of the output string (including ellipsis)
+        ellipsis: String to append when text is truncated
+        
+    Returns:
+        Truncated text with ellipsis if needed
+    """
+    if len(text) <= max_length:
+        return text
+    return text[:max_length - len(ellipsis)] + ellipsis
